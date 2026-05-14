@@ -68,6 +68,7 @@ def extract_all(filepath) -> tuple[dict, dict, pd.DataFrame]:
         if m_res["M22_min"]["M22"] is None or m22 < m_res["M22_min"]["M22"]:
             m_res["M22_min"] = {"M22": m22, "F11": f11, "Area": area, "row": row_idx}
 
+    df = pd.DataFrame(rows)
     return res, m_res, df
 
 
