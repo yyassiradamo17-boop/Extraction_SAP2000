@@ -31,10 +31,10 @@ def extract_all(filepath) -> tuple[dict, dict, pd.DataFrame]:
     }
 
     m_res = {
-        "M11_max": {"M11": None, "Area": None, "row": None},
-        "M11_min": {"M11": None, "Area": None, "row": None},
-        "M22_max": {"M22": None, "Area": None, "row": None},
-        "M22_min": {"M22": None, "Area": None, "row": None},
+        "M11_max": {"M11": None, "F22": None, "Area": None, "row": None},
+        "M11_min": {"M11": None, "F22": None, "Area": None, "row": None},
+        "M22_max": {"M22": None, "F11": None, "Area": None, "row": None},
+        "M22_min": {"M22": None, "F11": None, "Area": None, "row": None},
     }
 
     rows = []
@@ -60,32 +60,15 @@ def extract_all(filepath) -> tuple[dict, dict, pd.DataFrame]:
             res["F22_min"] = {"F22": f22, "M11": m11, "row": row_idx}
 
         if m_res["M11_max"]["M11"] is None or m11 > m_res["M11_max"]["M11"]:
-            m_res["M11_max"] = {"M11": m11, "Area": area, "row": row_idx}
+            m_res["M11_max"] = {"M11": m11, "F22": f22, "Area": area, "row": row_idx}
         if m_res["M11_min"]["M11"] is None or m11 < m_res["M11_min"]["M11"]:
-            m_res["M11_min"] = {"M11": m11, "Area": area, "row": row_idx}
+            m_res["M11_min"] = {"M11": m11, "F22": f22, "Area": area, "row": row_idx}
         if m_res["M22_max"]["M22"] is None or m22 > m_res["M22_max"]["M22"]:
-            m_res["M22_max"] = {"M22": m22, "Area": area, "row": row_idx}
+            m_res["M22_max"] = {"M22": m22, "F11": f11, "Area": area, "row": row_idx}
         if m_res["M22_min"]["M22"] is None or m22 < m_res["M22_min"]["M22"]:
-            m_res["M22_min"] = {"M22": m22, "Area": area, "row": row_idx}
+            m_res["M22_min"] = {"M22": m22, "F11": f11, "Area": area, "row": row_idx}
 
-    df = pd.DataFrame(rows)
-
-    def f22_for_area(area):
-        sub = df[df["Area"] == area]["F22"]
-        return {"max": sub.max(), "min": sub.min()}
-
-    def f11_for_area(area):
-        sub = df[df["Area"] == area]["F11"]
-        return {"max": sub.max(), "min": sub.min()}
-
-    area_res = {
-        "M11_max_area_F22": f22_for_area(m_res["M11_max"]["Area"]),
-        "M11_min_area_F22": f22_for_area(m_res["M11_min"]["Area"]),
-        "M22_max_area_F11": f11_for_area(m_res["M22_max"]["Area"]),
-        "M22_min_area_F11": f11_for_area(m_res["M22_min"]["Area"]),
-    }
-
-    return res, {"m_res": m_res, "area_res": area_res}, df
+    return res, m_res, df
 
 
 # ─────────────────────────────────────────────
@@ -104,10 +87,7 @@ if uploaded is None:
     st.stop()
 
 with st.spinner("Reading and analysing…"):
-    res, new_res, df = extract_all(uploaded)
-
-m_res    = new_res["m_res"]
-area_res = new_res["area_res"]
+    res, m_res, df = extract_all(uploaded)
 
 st.success(f"✅ Analysed **{len(df):,}** valid data rows.")
 
@@ -155,83 +135,65 @@ with cb:
 
 
 # ════════════════════════════════════════════
-# SECTION 2 — M11 Extremes → Area → F22
+# SECTION 2 — M11 Extremes + paired F22
 # ════════════════════════════════════════════
 st.markdown("---")
-st.header("🔎 Section 2 — M11 Extremes → Identified Area → F22 Range")
-st.markdown(
-    "The **min and max M11** values are located, their **Area Shell** is identified, "
-    "then the **min and max F22** within those areas are extracted."
-)
+st.header("🔎 Section 2 — M11 Extremes")
+st.markdown("The **min and max M11** values and their corresponding **F22** at the same row.")
 
-m11_max_area = m_res["M11_max"]["Area"]
-m11_min_area = m_res["M11_min"]["Area"]
-
-s2c1, s2c2 = st.columns(2)
-
+s2c1, s2c2, s2c3, s2c4 = st.columns(4)
 with s2c1:
-    st.subheader(f"Max M11 — Area {m11_max_area}")
     st.metric("Max M11 (KN-m/m)", f"{m_res['M11_max']['M11']:.4f}",
-              f"Area Shell: {m11_max_area}")
-    ar = area_res["M11_max_area_F22"]
-    st.dataframe(pd.DataFrame([
-        {"Metric": "Max M11",         "Value": f"{m_res['M11_max']['M11']:.4f} KN-m/m", "Excel Row": m_res["M11_max"]["row"]},
-        {"Metric": "Identified Area", "Value": str(m11_max_area),                        "Excel Row": ""},
-        {"Metric": "Max F22 in Area", "Value": f"{ar['max']:.4f} KN/m",                  "Excel Row": ""},
-        {"Metric": "Min F22 in Area", "Value": f"{ar['min']:.4f} KN/m",                  "Excel Row": ""},
-    ]), use_container_width=True, hide_index=True)
-
+              f"F22 = {m_res['M11_max']['F22']:.4f} KN/m")
 with s2c2:
-    st.subheader(f"Min M11 — Area {m11_min_area}")
     st.metric("Min M11 (KN-m/m)", f"{m_res['M11_min']['M11']:.4f}",
-              f"Area Shell: {m11_min_area}", delta_color="inverse")
-    ar = area_res["M11_min_area_F22"]
-    st.dataframe(pd.DataFrame([
-        {"Metric": "Min M11",         "Value": f"{m_res['M11_min']['M11']:.4f} KN-m/m", "Excel Row": m_res["M11_min"]["row"]},
-        {"Metric": "Identified Area", "Value": str(m11_min_area),                        "Excel Row": ""},
-        {"Metric": "Max F22 in Area", "Value": f"{ar['max']:.4f} KN/m",                  "Excel Row": ""},
-        {"Metric": "Min F22 in Area", "Value": f"{ar['min']:.4f} KN/m",                  "Excel Row": ""},
-    ]), use_container_width=True, hide_index=True)
+              f"F22 = {m_res['M11_min']['F22']:.4f} KN/m", delta_color="inverse")
+with s2c3:
+    st.metric("Area (Max M11)", str(m_res["M11_max"]["Area"]))
+with s2c4:
+    st.metric("Area (Min M11)", str(m_res["M11_min"]["Area"]))
+
+st.markdown(" ")
+st.subheader("M11 → F22")
+st.dataframe(pd.DataFrame([
+    {"Extreme": "Max M11", "M11 (KN-m/m)": m_res["M11_max"]["M11"],
+     "F22 (KN/m)": m_res["M11_max"]["F22"], "Area": m_res["M11_max"]["Area"],
+     "Excel Row": m_res["M11_max"]["row"]},
+    {"Extreme": "Min M11", "M11 (KN-m/m)": m_res["M11_min"]["M11"],
+     "F22 (KN/m)": m_res["M11_min"]["F22"], "Area": m_res["M11_min"]["Area"],
+     "Excel Row": m_res["M11_min"]["row"]},
+]), use_container_width=True, hide_index=True)
 
 
 # ════════════════════════════════════════════
-# SECTION 3 — M22 Extremes → Area → F11
+# SECTION 3 — M22 Extremes + paired F11
 # ════════════════════════════════════════════
 st.markdown("---")
-st.header("🔎 Section 3 — M22 Extremes → Identified Area → F11 Range")
-st.markdown(
-    "The **min and max M22** values are located, their **Area Shell** is identified, "
-    "then the **min and max F11** within those areas are extracted."
-)
+st.header("🔎 Section 3 — M22 Extremes")
+st.markdown("The **min and max M22** values and their corresponding **F11** at the same row.")
 
-m22_max_area = m_res["M22_max"]["Area"]
-m22_min_area = m_res["M22_min"]["Area"]
-
-s3c1, s3c2 = st.columns(2)
-
+s3c1, s3c2, s3c3, s3c4 = st.columns(4)
 with s3c1:
-    st.subheader(f"Max M22 — Area {m22_max_area}")
     st.metric("Max M22 (KN-m/m)", f"{m_res['M22_max']['M22']:.4f}",
-              f"Area Shell: {m22_max_area}")
-    ar = area_res["M22_max_area_F11"]
-    st.dataframe(pd.DataFrame([
-        {"Metric": "Max M22",         "Value": f"{m_res['M22_max']['M22']:.4f} KN-m/m", "Excel Row": m_res["M22_max"]["row"]},
-        {"Metric": "Identified Area", "Value": str(m22_max_area),                        "Excel Row": ""},
-        {"Metric": "Max F11 in Area", "Value": f"{ar['max']:.4f} KN/m",                  "Excel Row": ""},
-        {"Metric": "Min F11 in Area", "Value": f"{ar['min']:.4f} KN/m",                  "Excel Row": ""},
-    ]), use_container_width=True, hide_index=True)
-
+              f"F11 = {m_res['M22_max']['F11']:.4f} KN/m")
 with s3c2:
-    st.subheader(f"Min M22 — Area {m22_min_area}")
     st.metric("Min M22 (KN-m/m)", f"{m_res['M22_min']['M22']:.4f}",
-              f"Area Shell: {m22_min_area}", delta_color="inverse")
-    ar = area_res["M22_min_area_F11"]
-    st.dataframe(pd.DataFrame([
-        {"Metric": "Min M22",         "Value": f"{m_res['M22_min']['M22']:.4f} KN-m/m", "Excel Row": m_res["M22_min"]["row"]},
-        {"Metric": "Identified Area", "Value": str(m22_min_area),                        "Excel Row": ""},
-        {"Metric": "Max F11 in Area", "Value": f"{ar['max']:.4f} KN/m",                  "Excel Row": ""},
-        {"Metric": "Min F11 in Area", "Value": f"{ar['min']:.4f} KN/m",                  "Excel Row": ""},
-    ]), use_container_width=True, hide_index=True)
+              f"F11 = {m_res['M22_min']['F11']:.4f} KN/m", delta_color="inverse")
+with s3c3:
+    st.metric("Area (Max M22)", str(m_res["M22_max"]["Area"]))
+with s3c4:
+    st.metric("Area (Min M22)", str(m_res["M22_min"]["Area"]))
+
+st.markdown(" ")
+st.subheader("M22 → F11")
+st.dataframe(pd.DataFrame([
+    {"Extreme": "Max M22", "M22 (KN-m/m)": m_res["M22_max"]["M22"],
+     "F11 (KN/m)": m_res["M22_max"]["F11"], "Area": m_res["M22_max"]["Area"],
+     "Excel Row": m_res["M22_max"]["row"]},
+    {"Extreme": "Min M22", "M22 (KN-m/m)": m_res["M22_min"]["M22"],
+     "F11 (KN/m)": m_res["M22_min"]["F11"], "Area": m_res["M22_min"]["Area"],
+     "Excel Row": m_res["M22_min"]["row"]},
+]), use_container_width=True, hide_index=True)
 
 
 # ════════════════════════════════════════════
